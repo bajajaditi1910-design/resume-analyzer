@@ -2,98 +2,97 @@ import streamlit as st
 from PyPDF2 import PdfReader
 import re
 
-st.set_page_config(page_title="Resume Analyzer", layout="wide")
-
-st.title("🚀 AI Resume Analyzer (Rule-Based)")
-st.markdown("### 📄 Upload multiple resumes & compare with job description")
-
-uploaded_files = st.file_uploader(
-    "Upload Resumes (PDF)", type="pdf", accept_multiple_files=True
+# ---------------- CONFIG ----------------
+st.set_page_config(
+    page_title="Resume Analyzer",
+    page_icon="📄",
+    layout="wide"
 )
 
-jd = st.text_area("Paste Job Description")
+# ---------------- HEADER ----------------
+st.title("📄 Resume Analyzer")
+st.markdown("### 🚀 Analyze resumes, match skills & rank candidates")
+st.divider()
 
-skills_db = [
-    "python", "java", "sql", "dbms", "react",
-    "node", "javascript", "html", "css", "mongodb",
-    "dsa"
+# ---------------- SIDEBAR ----------------
+st.sidebar.title("⚙️ Settings")
+job_description = st.sidebar.text_area("📌 Paste Job Description")
+
+# ---------------- SKILLS LIST ----------------
+SKILLS_DB = [
+    "python", "java", "sql", "react.js", "react", "machine learning",
+    "data analysis", "c++", "javascript", "html", "css", "dsa"
 ]
 
-skill_aliases = {
-    "dsa": ["data structures", "algorithms", "data structures and algorithms"],
-    "javascript": ["js"],
-    "node": ["node.js", "nodejs"],
-    "react": ["react.js", "reactjs"],
-    "sql": ["mysql", "postgresql"]
-}
+# ---------------- FUNCTIONS ----------------
 
-display_names = {
-    "react": "React.js",
-    "node": "Node.js",
-    "javascript": "JavaScript",
-    "dsa": "DSA"
-}
-
-def format_skills(skill_list):
-    return ", ".join([display_names.get(skill, skill.capitalize()) for skill in skill_list])
-
-def extract_text(file):
-    reader = PdfReader(file)
+def extract_text(pdf_file):
     text = ""
+    reader = PdfReader(pdf_file)
     for page in reader.pages:
         text += page.extract_text() or ""
     return text.lower()
 
-stopwords = [
-    "we", "are", "for", "a", "the", "and", "with",
-    "in", "of", "to", "is", "required",
-    "software", "skills", "developer", "knowledge",
-    "backend", "development", "looking", "need", "jobs"
-]
 
-if uploaded_files and jd:
-    jd_text = jd.lower()
+def normalize_text(text):
+    text = text.lower()
+    text = text.replace("reactjs", "react.js")
+    text = text.replace("react js", "react.js")
+    return text
 
-    jd_words = re.split(r"[,\s]+", jd_text)
-    jd_words = [word.replace(".js", "").replace(".", "") for word in jd_words]
 
-    jd_keywords = [
-        word.strip()
-        for word in jd_words
-        if word and word not in stopwords
-    ]
+def extract_skills(text):
+    text = normalize_text(text)
+    found = set()
 
-    jd_skills = [skill for skill in skills_db if skill in jd_keywords]
+    for skill in SKILLS_DB:
+        pattern = r"\b" + re.escape(skill.lower()) + r"\b"
+        if re.search(pattern, text):
+            found.add(skill.lower())
+
+    return list(found)
+
+
+def calculate_score(resume_skills, jd_skills):
+    if not jd_skills:
+        return 0
+    matched = set(resume_skills) & set(jd_skills)
+    return int((len(matched) / len(jd_skills)) * 100)
+
+
+# ---------------- FILE UPLOAD ----------------
+uploaded_files = st.file_uploader(
+    "📤 Upload Resume PDFs",
+    type=["pdf"],
+    accept_multiple_files=True
+)
+
+# ---------------- PROCESS ----------------
+if uploaded_files and job_description:
+
+    jd_text = normalize_text(job_description)
+    jd_skills = extract_skills(jd_text)
 
     results = []
 
     for file in uploaded_files:
-        resume_text = extract_text(file)
+        text = extract_text(file)
+        skills = extract_skills(text)
 
-        found_skills = []
-
-        for skill in jd_skills:
-            if skill in resume_text:
-                found_skills.append(skill)
-            elif skill in skill_aliases:
-                for alias in skill_aliases[skill]:
-                    if alias in resume_text:
-                        found_skills.append(skill)
-                        break
-
-        missing_skills = [skill for skill in jd_skills if skill not in found_skills]
-
-        score = int((len(found_skills) / len(jd_skills)) * 100) if jd_skills else 0
+        score = calculate_score(skills, jd_skills)
+        missing = list(set(jd_skills) - set(skills))
 
         results.append({
             "name": file.name,
             "score": score,
-            "skills": found_skills,
-            "missing": missing_skills
+            "skills": skills,
+            "missing": missing
         })
 
+    # SORT BY SCORE
     results = sorted(results, key=lambda x: x["score"], reverse=True)
 
+    # ---------------- DISPLAY ----------------
     st.subheader("🏆 Resume Ranking")
 
     for i, res in enumerate(results):
@@ -103,18 +102,33 @@ if uploaded_files and jd:
             col1, col2 = st.columns(2)
 
             with col1:
-                st.metric("Match Score", f"{res['score']}%")
+                # Color score
+                if res["score"] > 80:
+                    st.success(f"Match Score: {res['score']}%")
+                elif res["score"] > 50:
+                    st.warning(f"Match Score: {res['score']}%")
+                else:
+                    st.error(f"Match Score: {res['score']}%")
+
+                # Progress bar
+                st.progress(res["score"] / 100)
 
             with col2:
                 st.metric("Skills Found", len(res["skills"]))
 
+            # Skills Found
             st.success("✅ Skills Found:")
-            st.write(format_skills(res["skills"]) if res["skills"] else "None")
+            st.write(", ".join(res["skills"]) if res["skills"] else "None")
 
+            # Missing Skills
             st.error("❌ Missing Skills:")
-            st.write(format_skills(res["missing"]) if res["missing"] else "None")
+            st.write(", ".join(res["missing"]) if res["missing"] else "None")
 
-            if res["missing"]:
-                st.info(f"💡 Improve by adding: {format_skills(res['missing'])}")
+            # Suggested Skills
+            suggested = list(set(SKILLS_DB) - set(res["skills"]) - set(res["missing"]))
+            st.info(f"💡 Suggested Skills: {', '.join(suggested[:5])}")
 
             st.divider()
+
+else:
+    st.info("👈 Upload resumes and paste job description to start analysis")
