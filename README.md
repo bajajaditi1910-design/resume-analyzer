@@ -4,7 +4,7 @@ A web-based Resume Analyzer that simulates an Applicant Tracking System (ATS) us
 It analyzes resumes, ranks candidates, and identifies missing skills based on job descriptions for Software Engineering roles.
 
 ## 🚀 Live Demo
-https://your-app-name.streamlit.app
+https://resume-analyzer-aditi.streamlit.app
 
 ## 💡 Features
 - Resume ranking based on match score
