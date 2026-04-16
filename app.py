@@ -3,7 +3,7 @@ from PyPDF2 import PdfReader
 import re
 
 st.set_page_config(page_title="Resume Analyzer", layout="wide")
-st.title("📄 ATS Resume Analyzer (SWE Roles)")
+st.title("📄 Rule-Based ATS Resume Analyzer (SWE Roles)")
 st.markdown("### 📄 Upload multiple resumes & compare with job description")
 
 uploaded_files = st.file_uploader(
