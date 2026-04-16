@@ -1,16 +1,15 @@
 # 📄 Resume Analyzer
 
-An ATS-based web application that analyzes resumes, ranks candidates, and identifies missing skills based on job descriptions.
+An ATS-based web application that analyzes resumes, ranks candidates, and identifies missing skills.
 
 ## 🚀 Live Demo
-https://your-app-name.streamlit.app
+https://resume-analyzer-aditi.streamlit.app
 
 ## 💡 Features
 - Resume ranking
 - Skill matching
 - Missing skills detection
 - Suggested skills improvement
-- Clean UI with Streamlit
 
 ## 🛠 Tech Stack
 - Python
