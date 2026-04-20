@@ -1,135 +1,120 @@
 import streamlit as st
-from utils import calculate_splitwise, pairwise_settlement, simplify_debts
+from PyPDF2 import PdfReader
+import re
 
-st.set_page_config(page_title="Splitwise App", layout="wide")
+st.set_page_config(page_title="Resume Analyzer", layout="wide")
 
-st.title("💸 Splitwise Clone - Group Expense Manager")
+st.title("🚀 AI Resume Analyzer (Rule-Based)")
+st.markdown("### 📄 Upload multiple resumes & compare with job description")
 
-# ---------------- SESSION STATE ----------------
-if "group_created" not in st.session_state:
-    st.session_state.group_created = False
-if "members" not in st.session_state:
-    st.session_state.members = []
-if "expenses" not in st.session_state:
-    st.session_state.expenses = []
-if "group_name" not in st.session_state:
-    st.session_state.group_name = ""
+uploaded_files = st.file_uploader(
+    "Upload Resumes (PDF)", type="pdf", accept_multiple_files=True
+)
 
-# ---------------- RESET ----------------
-if st.button("🔄 Reset App"):
-    st.session_state.group_created = False
-    st.session_state.members = []
-    st.session_state.expenses = []
-    st.session_state.group_name = ""
-    st.rerun()
+jd = st.text_area("Paste Job Description")
 
-# ---------------- CREATE GROUP ----------------
-if not st.session_state.group_created:
+skills_db = [
+    "python", "java", "sql", "dbms", "react",
+    "node", "javascript", "html", "css", "mongodb",
+    "dsa"
+]
 
-    st.header("🧑‍🤝‍🧑 Create Group")
+skill_aliases = {
+    "dsa": ["data structures", "algorithms", "data structures and algorithms"],
+    "javascript": ["js"],
+    "node": ["node.js", "nodejs"],
+    "react": ["react.js", "reactjs"],
+    "sql": ["mysql", "postgresql"]
+}
 
-    with st.form("group_form"):
-        group_name = st.text_input("Group Name")
-        num_members = int(st.number_input("Number of Members", min_value=1, step=1))
+display_names = {
+    "react": "React.js",
+    "node": "Node.js",
+    "javascript": "JavaScript",
+    "dsa": "DSA"
+}
 
-        names = []
-        for i in range(num_members):
-            name = st.text_input(f"Member {i+1} Name", key=f"name_{i}")
-            names.append(name)
+def format_skills(skill_list):
+    return ", ".join([display_names.get(skill, skill.capitalize()) for skill in skill_list])
 
-        submit = st.form_submit_button("Create Group")
+def extract_text(file):
+    reader = PdfReader(file)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() or ""
+    return text.lower()
 
-        if submit:
-            if not group_name:
-                st.error("Please enter group name")
-            elif "" in names:
-                st.error("Please enter all member names")
-            else:
-                st.session_state.group_created = True
-                st.session_state.members = names
-                st.session_state.group_name = group_name
-                st.success(f"Group '{group_name}' created!")
+stopwords = [
+    "we", "are", "for", "a", "the", "and", "with",
+    "in", "of", "to", "is", "required",
+    "software", "skills", "developer", "knowledge",
+    "backend", "development", "looking", "need", "jobs"
+]
 
-# ---------------- MAIN APP ----------------
-else:
-    st.header(f"👥 Group: {st.session_state.group_name}")
+if uploaded_files and jd:
+    jd_text = jd.lower()
 
-    # -------- ADD EXPENSE --------
-    st.subheader("💰 Add Expense")
+    jd_words = re.split(r"[,\s]+", jd_text)
+    jd_words = [word.replace(".js", "").replace(".", "") for word in jd_words]
 
-    col1, col2 = st.columns(2)
+    jd_keywords = [
+        word.strip()
+        for word in jd_words
+        if word and word not in stopwords
+    ]
 
-    with col1:
-        payer = st.selectbox("Who paid?", st.session_state.members)
+    jd_skills = [skill for skill in skills_db if skill in jd_keywords]
 
-    with col2:
-        amount = st.number_input("Amount", min_value=0.0)
+    results = []
 
-    participants = st.multiselect("Split among:", st.session_state.members)
+    for file in uploaded_files:
+        resume_text = extract_text(file)
 
-    if st.button("Add Expense"):
-        if not participants:
-            st.error("Select participants")
-        elif amount <= 0:
-            st.error("Enter valid amount")
-        else:
-            st.session_state.expenses.append((payer, amount, participants.copy()))
-            st.success("Expense added!")
+        found_skills = []
 
-    # -------- SHOW EXPENSES --------
-    st.subheader("📄 All Expenses")
+        for skill in jd_skills:
+            if skill in resume_text:
+                found_skills.append(skill)
+            elif skill in skill_aliases:
+                for alias in skill_aliases[skill]:
+                    if alias in resume_text:
+                        found_skills.append(skill)
+                        break
 
-    if st.session_state.expenses:
-        for e in st.session_state.expenses:
-            st.write(f"{e[0]} paid ₹{e[1]} for {', '.join(e[2])}")
-    else:
-        st.info("No expenses added yet")
+        missing_skills = [skill for skill in jd_skills if skill not in found_skills]
 
-    # -------- CALCULATE DEBTS --------
-    debts = calculate_splitwise(st.session_state.expenses)
+        score = int((len(found_skills) / len(jd_skills)) * 100) if jd_skills else 0
 
-    # -------- DETAILED SPLIT --------
-    st.subheader("📊 Detailed Split")
+        results.append({
+            "name": file.name,
+            "score": score,
+            "skills": found_skills,
+            "missing": missing_skills
+        })
 
-    if debts:
-        for debtor in debts:
-            for creditor in debts[debtor]:
-                amt = debts[debtor][creditor]
+    results = sorted(results, key=lambda x: x["score"], reverse=True)
 
-                st.markdown(
-                    f"🔴 <b>{debtor}</b> owes 🟢 <b>{creditor}</b> ₹{round(amt,2)}",
-                    unsafe_allow_html=True
-                )
-    else:
-        st.info("No splits yet")
+    st.subheader("🏆 Resume Ranking")
 
-    # -------- FINAL SETTLEMENT --------
-    st.subheader("💸 Final Settlement")
+    for i, res in enumerate(results):
+        with st.container():
+            st.markdown(f"### #{i+1} {res['name']}")
 
-    option = st.radio(
-        "Choose settlement type:",
-        ["Pairwise (Clear)", "Optimized (Minimum Transactions)"]
-    )
+            col1, col2 = st.columns(2)
 
-    if st.button("Calculate Settlement"):
+            with col1:
+                st.metric("Match Score", f"{res['score']}%")
 
-        if not st.session_state.expenses:
-            st.warning("No expenses to calculate")
-        else:
-            if option == "Pairwise (Clear)":
-                result = pairwise_settlement(debts)
-            else:
-                result = simplify_debts(debts)
+            with col2:
+                st.metric("Skills Found", len(res["skills"]))
 
-            for r in result:
-                if "owes" in r:
-                    debtor, rest = r.split(" owes ")
-                else:
-                    debtor, rest = r.split(" pays ")
+            st.success("✅ Skills Found:")
+            st.write(format_skills(res["skills"]) if res["skills"] else "None")
 
-                creditor, amount = rest.split(" ₹")
+            st.error("❌ Missing Skills:")
+            st.write(format_skills(res["missing"]) if res["missing"] else "None")
 
-                st.markdown(
-                    f"🔴 <b>{debtor}</b> → 🟢 <b>{creditor}</b> ₹{amount}",
-                    unsafe_allow_html=True
-                )
+            if res["missing"]:
+                st.info(f"💡 Improve by adding: {format_skills(res['missing'])}")
+
+            st.divider()
