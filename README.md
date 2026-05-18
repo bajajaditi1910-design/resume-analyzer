@@ -6,6 +6,9 @@ It analyzes resumes, ranks candidates, and identifies missing skills based on jo
 ## 🚀 Live Demo
 https://resume-analyzer-aditi.streamlit.app
 
+## 🎥 Demo Video  
+
+
 ## 💡 Features
 - Resume ranking based on match score
 - Skill extraction using rule-based matching
