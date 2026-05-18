@@ -4,7 +4,7 @@ import re
 
 st.set_page_config(page_title="Resume Analyzer", layout="wide")
 
-st.title("🚀 AI Resume Analyzer (Rule-Based)")
+st.title("🚀 ATS Resume Analyzer (Rule-Based)")
 st.markdown("### 📄 Upload multiple resumes & compare with job description")
 
 uploaded_files = st.file_uploader(
